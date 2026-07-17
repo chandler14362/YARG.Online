@@ -453,8 +453,6 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
 
             var missing = new List<string>();
 
-            YargLogger.LogInfo(
-                $"QUEUE CHECK: requester={userId} hard={songHash} soft={songGameplayHash} members={entry.Members.Count}");
 
             foreach (var member in entry.Members)
             {
@@ -462,7 +460,6 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
 
                 if (!entry.PlayerLibraries.TryGetValue(member, out var memberLib))
                 {
-                    YargLogger.LogInfo($"QUEUE CHECK: {member} has no library");
                     missing.Add(member);
                     continue;
                 }
@@ -470,11 +467,6 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
                 bool hasHard = memberLib.Contains(songHash);
                 bool hasSoft = songGameplayHash != null && memberLib.Contains(songGameplayHash);
 
-                YargLogger.LogInfo(
-                    $"QUEUE CHECK: member={member} " +
-                    $"hashes={memberLib.Count} " +
-                    $"hasHard={hasHard} " +
-                    $"hasSoft={hasSoft}");
 
                 if (!hasHard && !hasSoft)
                 {
@@ -482,8 +474,6 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
                 }
             }
 
-            YargLogger.LogInfo(
-                $"QUEUE RESULT: missing=[{string.Join(", ", missing)}]");
 
             // Clamp speed to the same range the client popup uses ([0.1, 50] multiplier).
             float clampedSpeed = Math.Clamp(songSpeed, 0.1f, 50f);
