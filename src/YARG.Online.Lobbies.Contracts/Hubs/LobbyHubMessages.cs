@@ -68,6 +68,7 @@ public sealed record ChatMessage(
 public sealed record QueuedSongDto(
     long Sequence,
     string SongHash,
+    string? SongGameplayHash,
     string RequesterId,
     DateTimeOffset QueuedAt,
     string[] MissingFor)
@@ -76,7 +77,7 @@ public sealed record QueuedSongDto(
     public float SongSpeed { get; init; } = 1f;
 }
 
-public sealed record QueueSongArgs(string SongHash)
+public sealed record QueueSongArgs(string SongHash, string? SongGameplayHash = null)
 {
     /// <summary>Requester's chosen playback speed multiplier (1.0 = 100%). Server clamps to [0.1, 50].</summary>
     public float SongSpeed { get; init; } = 1f;

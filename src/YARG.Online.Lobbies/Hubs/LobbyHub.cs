@@ -883,7 +883,9 @@ public sealed class LobbyHub : Hub<ILobbyHubClient>, ILobbyHub
         }
 
         var hash = args.SongHash.ToLowerInvariant();
-        var result = await _repo.EnqueueSongAsync(lobbyId, userId, hash, args.SongSpeed, _clock.GetUtcNow(), Context.ConnectionAborted);
+        var gameplayHash = args.SongGameplayHash?.ToLowerInvariant();
+        var result = await _repo.EnqueueSongAsync(
+            lobbyId, userId, hash, args.SongSpeed, _clock.GetUtcNow(), Context.ConnectionAborted, gameplayHash);
 
         _logger.LogTrace(
             "QueueSong outcome: ConnectionId={ConnectionId} LobbyId={LobbyId} UserId={UserId} SongHash={SongHash} Outcome={Outcome} Sequence={Sequence}",

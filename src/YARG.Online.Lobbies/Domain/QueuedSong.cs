@@ -6,4 +6,5 @@ public sealed record QueuedSong(
     string RequesterId,
     DateTimeOffset QueuedAt,
     IReadOnlyList<string> MissingFor,
-    float SongSpeed);
+    float SongSpeed,
+    string? SongGameplayHash = null);

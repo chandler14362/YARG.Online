@@ -44,6 +44,15 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
         public readonly object Lock = new();
     }
 
+    /// <summary>
+    /// A player is considered to own a song if their library contains its primary hash
+    /// OR its optional secondary (gameplay) hash. Two format-different copies of the
+    /// same underlying song (e.g. a CON pack and its ini-extracted equivalent) can share
+    /// a gameplay hash while their primary hashes differ, so either match counts.
+    /// </summary>
+    private static bool LibHasSong(HashSet<string> lib, string songHash, string? songGameplayHash) =>
+        lib.Contains(songHash) || (songGameplayHash != null && lib.Contains(songGameplayHash));
+
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
     private readonly ILobbyIdGenerator _idGen;
     private readonly int _maxChatHistorySize;
@@ -170,7 +179,7 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
             for (var i = 0; i < entry.SongQueue.Count; i++)
             {
                 var queued = entry.SongQueue[i];
-                if (lib.Contains(queued.SongHash)) continue;
+                if (LibHasSong(lib, queued.SongHash, queued.SongGameplayHash)) continue;
 
                 var newMissing = new List<string>(queued.MissingFor.Count + 1);
                 newMissing.AddRange(queued.MissingFor);
@@ -414,7 +423,8 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
         string songHash,
         float songSpeed,
         DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? songGameplayHash = null)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -430,7 +440,8 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
                 return Task.FromResult(new EnqueueResult(EnqueueOutcome.NotMember, null));
             }
 
-            if (!entry.PlayerLibraries.TryGetValue(userId, out var requesterLib) || !requesterLib.Contains(songHash))
+            if (!entry.PlayerLibraries.TryGetValue(userId, out var requesterLib)
+                || !LibHasSong(requesterLib, songHash, songGameplayHash))
             {
                 return Task.FromResult(new EnqueueResult(EnqueueOutcome.NotInLibrary, null));
             }
@@ -441,14 +452,38 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
             }
 
             var missing = new List<string>();
+
+            YargLogger.LogInfo(
+                $"QUEUE CHECK: requester={userId} hard={songHash} soft={songGameplayHash} members={entry.Members.Count}");
+
             foreach (var member in entry.Members)
             {
                 if (member == userId) continue;
-                if (!entry.PlayerLibraries.TryGetValue(member, out var memberLib) || !memberLib.Contains(songHash))
+
+                if (!entry.PlayerLibraries.TryGetValue(member, out var memberLib))
+                {
+                    YargLogger.LogInfo($"QUEUE CHECK: {member} has no library");
+                    missing.Add(member);
+                    continue;
+                }
+
+                bool hasHard = memberLib.Contains(songHash);
+                bool hasSoft = songGameplayHash != null && memberLib.Contains(songGameplayHash);
+
+                YargLogger.LogInfo(
+                    $"QUEUE CHECK: member={member} " +
+                    $"hashes={memberLib.Count} " +
+                    $"hasHard={hasHard} " +
+                    $"hasSoft={hasSoft}");
+
+                if (!hasHard && !hasSoft)
                 {
                     missing.Add(member);
                 }
             }
+
+            YargLogger.LogInfo(
+                $"QUEUE RESULT: missing=[{string.Join(", ", missing)}]");
 
             // Clamp speed to the same range the client popup uses ([0.1, 50] multiplier).
             float clampedSpeed = Math.Clamp(songSpeed, 0.1f, 50f);
@@ -458,7 +493,8 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
                 RequesterId: userId,
                 QueuedAt: now,
                 MissingFor: missing,
-                SongSpeed: clampedSpeed);
+                SongSpeed: clampedSpeed,
+                SongGameplayHash: songGameplayHash);
             entry.SongQueue.Add(queued);
             SyncCurrentSong(entry);
 
@@ -934,7 +970,7 @@ public sealed class InMemoryLobbyRepository : ILobbyRepository
             for (var i = 0; i < entry.SongQueue.Count; i++)
             {
                 var queued = entry.SongQueue[i];
-                bool userHas = newLib.Contains(queued.SongHash);
+                bool userHas = LibHasSong(newLib, queued.SongHash, queued.SongGameplayHash);
                 bool userListedMissing = queued.MissingFor.Contains(userId);
 
                 if (userHas && userListedMissing)

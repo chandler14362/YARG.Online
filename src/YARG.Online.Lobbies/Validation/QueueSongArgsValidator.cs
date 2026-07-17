@@ -12,6 +12,10 @@ public sealed class QueueSongArgsValidator : AbstractValidator<QueueSongArgs>
             .Must(h => h is not null && Sha1Hex.IsMatch(h))
             .WithMessage("Hash must be 40 hex characters.");
 
+        RuleFor(x => x.SongGameplayHash)
+            .Must(h => h is null || Sha1Hex.IsMatch(h))
+            .WithMessage("Gameplay hash must be 40 hex characters.");
+
         RuleFor(x => x.SongSpeed)
             .InclusiveBetween(0.1f, 50f)
             .WithMessage("SongSpeed must be a multiplier between 0.1 and 50 (10% to 5000%).");

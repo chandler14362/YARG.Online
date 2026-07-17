@@ -262,7 +262,8 @@ public interface ILobbyRepository
         string songHash,
         float songSpeed,
         DateTimeOffset now,
-        CancellationToken ct);
+        CancellationToken ct,
+        string? songGameplayHash = null);
 
     /// <summary>
     /// Remove a queued song. Allowed only when the caller is the lobby host or the original requester.
